@@ -1,0 +1,2900 @@
+{
+  "datasets": [
+    {
+      "name": "datos_mercado",
+      "displayName": "Mercado inmobiliario (model_data)",
+      "config": {
+        "source": "housing_colombia.gold.housing_model_data",
+        "measures": [
+          {
+            "name": "n_viviendas",
+            "expr": "COUNT(1)",
+            "comment": "Número de anuncios de venta en COP"
+          },
+          {
+            "name": "precio_mediana",
+            "expr": "ROUND(MEDIAN(price), 1)",
+            "comment": "Mediana del precio de venta en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "precio_promedio",
+            "expr": "ROUND(AVG(price), 1)",
+            "comment": "Promedio del precio de venta en COP (sensible a la cola derecha)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "precio_maximo",
+            "expr": "ROUND(MAX(price), 1)",
+            "comment": "Precio máximo observado en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "n_departamentos",
+            "expr": "COUNT(DISTINCT departamento)",
+            "comment": "Departamentos distintos con anuncios"
+          },
+          {
+            "name": "n_ciudades",
+            "expr": "COUNT(DISTINCT ciudad)",
+            "comment": "Ciudades distintas con anuncios"
+          }
+        ],
+        "version": "1.1",
+        "comment": "Universo de modelado del mercado inmobiliario colombiano (568.478 ventas en COP, jul-2020 a ago-2021) con dimensiones de análisis de mercado y medidas de precio.",
+        "dimensions": [
+          {
+            "name": "start_date",
+            "expr": "start_date",
+            "comment": "Fecha de publicación del anuncio"
+          },
+          {
+            "name": "split",
+            "expr": "split",
+            "comment": "train | test según corte temporal 80/20 por start_date"
+          },
+          {
+            "name": "property_type",
+            "expr": "property_type",
+            "comment": "Tipo de propiedad"
+          },
+          {
+            "name": "departamento",
+            "expr": "COALESCE(departamento, 'Sin especificar')",
+            "comment": "Departamento del anuncio (NULL se muestra como 'Sin especificar')"
+          },
+          {
+            "name": "ciudad",
+            "expr": "COALESCE(ciudad, 'Sin especificar')",
+            "comment": "Ciudad del anuncio (NULL se muestra como 'Sin especificar')"
+          },
+          {
+            "name": "bathrooms",
+            "expr": "bathrooms",
+            "comment": "Número de baños (variable más importante del modelo)"
+          },
+          {
+            "name": "price",
+            "expr": "price",
+            "comment": "Precio de venta del anuncio en COP (para acotar rangos y excluir valores atípicos extremos)"
+          },
+          {
+            "name": "depto_con_muestra",
+            "expr": "COUNT(1) OVER (PARTITION BY departamento) >= 30",
+            "comment": "Departamento con al menos 30 anuncios (LOD fijo por departamento; excluye muestras muy pequeñas)"
+          }
+        ]
+      }
+    },
+    {
+      "name": "resumen_ciudades",
+      "displayName": "Resumen de ciudades",
+      "config": {
+        "source": "SELECT s.*, s.precio_m2_mediana IS NOT NULL AS con_m2,\n       s.precio_m2_mediana BETWEEN 500000 AND 25000000 AS m2_en_rango,\n       a.area_promedio_m2, a.n_con_area,\n       SUM(a.n_con_area) OVER (PARTITION BY s.departamento) >= 20 AS depto_con_m2_suficiente\nFROM housing_colombia.gold.housing_city_summary s LEFT JOIN (\n  SELECT departamento, ciudad,\n         AVG(surface_covered) AS area_promedio_m2,\n         COUNT(surface_covered) AS n_con_area\n  FROM housing_colombia.gold.housing_model_data\n  GROUP BY departamento, ciudad\n) a\n  ON s.departamento <=> a.departamento AND s.ciudad <=> a.ciudad\nORDER BY s.registros DESC\n",
+        "measures": [
+          {
+            "name": "registros",
+            "expr": "SUM(registros)",
+            "comment": "Número de anuncios de venta en COP (volumen de oferta)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "precio_mediana",
+            "expr": "ROUND(AVG(precio_mediana), 1)",
+            "comment": "Mediana del precio en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "precio_promedio",
+            "expr": "ROUND(AVG(precio_promedio), 1)",
+            "comment": "Promedio del precio en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "precio_m2_mediana",
+            "expr": "ROUND(AVG(precio_m2_mediana), 1)",
+            "comment": "Promedio de las medianas de precio/m2 construido por ciudad en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "area_promedio",
+            "expr": "ROUND(AVG(area_promedio_m2), 1)",
+            "comment": "Área construida promedio en m2 (desde gold.housing_model_data)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "pct_atipicos",
+            "expr": "AVG(pct_atipicos_precio)",
+            "comment": "Fracción de anuncios atípicos de precio (regla IQR), mostrada como porcentaje",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "comment": "Estadísticas de precio por ciudad y departamento (345 ciudades) enriquecidas con área promedio desde gold.housing_model_data; incluye banderas para excluir precios/m² erróneos y departamentos con poca muestra de área.",
+        "dimensions": [
+          {
+            "name": "departamento",
+            "expr": "COALESCE(departamento, 'Sin especificar')",
+            "comment": "Departamento (NULL se muestra como 'Sin especificar')"
+          },
+          {
+            "name": "ciudad",
+            "expr": "COALESCE(ciudad, 'Sin especificar')",
+            "comment": "Ciudad (NULL se muestra como 'Sin especificar')"
+          },
+          {
+            "name": "con_m2",
+            "expr": "con_m2",
+            "comment": "Indica si la ciudad tiene precio por m² informado (superficie construida presente)"
+          },
+          {
+            "name": "m2_en_rango",
+            "expr": "m2_en_rango",
+            "comment": "Precio/m² entre 500 mil y 25 millones COP (excluye errores de superficie o precio)"
+          },
+          {
+            "name": "depto_con_m2_suficiente",
+            "expr": "depto_con_m2_suficiente",
+            "comment": "Departamento con al menos 20 anuncios con área informada"
+          }
+        ]
+      }
+    },
+    {
+      "name": "importancia_variables",
+      "displayName": "Importancia de variables",
+      "config": {
+        "source": "housing_colombia.gold.housing_feature_importance",
+        "measures": [
+          {
+            "name": "importancia",
+            "expr": "ROUND(AVG(importancia), 1)",
+            "comment": "Incremento del MAE en COP al permutar la variable",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "comment": "Importancia predictiva (permutation importance) de las 14 variables del modelo ganador.",
+        "dimensions": [
+          {
+            "name": "variable",
+            "expr": "variable",
+            "comment": "Variable predictora"
+          },
+          {
+            "name": "ranking",
+            "expr": "ranking",
+            "comment": "1 = variable más importante"
+          }
+        ]
+      }
+    },
+    {
+      "name": "predicciones",
+      "displayName": "Predicciones del modelo (test)",
+      "config": {
+        "source": "SELECT p.id, p.modelo, p.precio_real, p.precio_predicho, p.error, p.error_pct,\n       m.departamento, m.ciudad, m.property_type, m.start_date,\n       m.bedrooms, m.bathrooms\nFROM housing_colombia.gold.housing_predictions p JOIN housing_colombia.gold.housing_model_data m ON p.id = m.id\n",
+        "measures": [
+          {
+            "name": "n_predicciones",
+            "expr": "COUNT(1)",
+            "comment": "Número de predicciones"
+          },
+          {
+            "name": "precio_real_mediana",
+            "expr": "ROUND(MEDIAN(precio_real), 1)",
+            "comment": "Mediana del precio real en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "precio_predicho_mediana",
+            "expr": "ROUND(MEDIAN(precio_predicho), 1)",
+            "comment": "Mediana del precio predicho en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "precio_predicho_promedio",
+            "expr": "ROUND(AVG(precio_predicho), 1)",
+            "comment": "Promedio del precio predicho en COP (para proyecciones de negocio)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "error_abs_medio",
+            "expr": "ROUND(AVG(ABS(error)), 1)",
+            "comment": "Error absoluto medio (MAE) en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "error_pct_medio",
+            "expr": "AVG(ABS(error_pct))",
+            "comment": "Error porcentual absoluto medio (fracción de precio_real), mostrado como porcentaje",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "comment": "Predicciones reales del modelo ganador (Gradient Boosting) sobre el test temporal de 114.325 anuncios, enriquecidas con ubicación, tipo, habitaciones y baños para análisis de escenarios por perfil de vivienda.",
+        "dimensions": [
+          {
+            "name": "departamento",
+            "expr": "COALESCE(departamento, 'Sin especificar')",
+            "comment": "Departamento del anuncio (desde model_data; NULL → 'Sin especificar')"
+          },
+          {
+            "name": "ciudad",
+            "expr": "COALESCE(ciudad, 'Sin especificar')",
+            "comment": "Ciudad del anuncio (desde model_data; NULL → 'Sin especificar')"
+          },
+          {
+            "name": "property_type",
+            "expr": "property_type",
+            "comment": "Tipo de propiedad (desde model_data)"
+          },
+          {
+            "name": "modelo",
+            "expr": "modelo",
+            "comment": "Modelo que generó la predicción"
+          },
+          {
+            "name": "start_date",
+            "expr": "start_date",
+            "comment": "Fecha de publicación del anuncio"
+          },
+          {
+            "name": "bedrooms",
+            "expr": "bedrooms",
+            "comment": "Número de alcobas del anuncio (para perfiles de vivienda)"
+          },
+          {
+            "name": "bathrooms",
+            "expr": "bathrooms",
+            "comment": "Número de baños del anuncio (para perfiles de vivienda)"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ajuste_distribuciones",
+      "displayName": "Ajuste de distribuciones de precio",
+      "config": {
+        "source": "housing_colombia.gold.housing_price_distribution",
+        "measures": [
+          {
+            "name": "shape",
+            "expr": "AVG(shape)",
+            "comment": "Parámetro de forma (NULL para Exponencial, que no tiene parámetro de forma)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 3.0
+              }
+            }
+          },
+          {
+            "name": "scale",
+            "expr": "AVG(scale)",
+            "comment": "Parámetro de escala en millones COP",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "k_params",
+            "expr": "AVG(k_params)",
+            "comment": "Número de parámetros estimados",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "log_verosimilitud",
+            "expr": "AVG(log_verosimilitud)",
+            "comment": "Log-verosimilitud del ajuste MLE"
+          },
+          {
+            "name": "aic",
+            "expr": "AVG(aic)",
+            "comment": "Criterio de información de Akaike (menor = mejor)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "bic",
+            "expr": "AVG(bic)",
+            "comment": "Criterio de información bayesiano",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "delta_aic",
+            "expr": "AVG(delta_aic)",
+            "comment": "AIC propio - AIC mínimo (0 = mejor)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "ks_estadistico",
+            "expr": "AVG(ks_estadistico)",
+            "comment": "Estadístico KS de bondad de ajuste",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 3.0
+              }
+            }
+          },
+          {
+            "name": "n",
+            "expr": "AVG(n)",
+            "comment": "Anuncios usados en el ajuste",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "comment": "Ajuste MLE de familias de distribución a los precios de venta (millones COP) y comparación por AIC/BIC/KS. Lognormal gana.",
+        "dimensions": [
+          {
+            "name": "distribucion",
+            "expr": "distribucion",
+            "comment": "Familia ajustada"
+          },
+          {
+            "name": "ranking_aic",
+            "expr": "ranking_aic",
+            "comment": "1 = mejor por AIC"
+          }
+        ]
+      }
+    },
+    {
+      "name": "modelos_metricas",
+      "displayName": "Métricas de modelos",
+      "config": {
+        "source": "housing_colombia.gold.housing_price_metrics",
+        "measures": [
+          {
+            "name": "rmse",
+            "expr": "ROUND(AVG(rmse), 1)",
+            "comment": "Raíz del error cuadrático medio en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "mae",
+            "expr": "ROUND(AVG(mae), 1)",
+            "comment": "Error absoluto medio en COP",
+            "format": {
+              "type": "currency",
+              "currencyCode": "COP",
+              "abbreviation": "compact",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "r2",
+            "expr": "AVG(r2)",
+            "comment": "R2 en escala de precio (COP)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 4.0
+              }
+            }
+          },
+          {
+            "name": "mape",
+            "expr": "AVG(mape)",
+            "comment": "Error porcentual absoluto medio, mostrado como porcentaje",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "n_train",
+            "expr": "AVG(n_train)",
+            "comment": "Anuncios de entrenamiento",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "n_test",
+            "expr": "AVG(n_test)",
+            "comment": "Anuncios del test temporal",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "comment": "Métricas reales de los 4 modelos entrenados, evaluadas sobre el test temporal. Ganador: GradientBoosting.",
+        "dimensions": [
+          {
+            "name": "modelo",
+            "expr": "modelo",
+            "comment": "Modelo evaluado"
+          }
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "name": "3046b8e4",
+      "displayName": "Panorama del Mercado",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_total_viviendas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "measure(n_viviendas)",
+                      "expression": "MEASURE(`n_viviendas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Viviendas en venta",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(n_viviendas)",
+                  "rowNumber": 0,
+                  "format": {
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-plain"
+                  },
+                  "style": {
+                    "fontWeight": 700,
+                    "foreground": "#1D4E89"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_precio_mediana",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "measure(precio_mediana)",
+                      "expression": "MEASURE(`precio_mediana`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Precio mediano (COP)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(precio_mediana)",
+                  "rowNumber": 0,
+                  "style": {
+                    "fontWeight": 700,
+                    "foreground": "#0E9384"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_precio_promedio",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "measure(precio_promedio)",
+                      "expression": "MEASURE(`precio_promedio`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Precio promedio (COP)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(precio_promedio)",
+                  "rowNumber": 0,
+                  "style": {
+                    "fontWeight": 700,
+                    "foreground": "#4338CA"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_ciudades",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "measure(n_ciudades)",
+                      "expression": "MEASURE(`n_ciudades`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Ciudades cubiertas",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(n_ciudades)",
+                  "rowNumber": 0,
+                  "style": {
+                    "fontWeight": 700,
+                    "foreground": "#D97706"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "linea_publicaciones_mes",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "monthly(start_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `start_date`)"
+                    },
+                    {
+                      "name": "measure(n_viviendas)",
+                      "expression": "MEASURE(`n_viviendas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Publicaciones por mes",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "lineShape": "smooth",
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(start_date)",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(n_viviendas)",
+                  "displayName": "Cantidad de viviendas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "pie_tipo_propiedad",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "measure(n_viviendas)",
+                      "expression": "MEASURE(`n_viviendas`)"
+                    },
+                    {
+                      "name": "property_type",
+                      "expression": "`property_type`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Viviendas por tipo de propiedad",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "measure(n_viviendas)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Viviendas"
+                },
+                "color": {
+                  "fieldName": "property_type",
+                  "displayName": "Tipo de propiedad",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 4,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_ciudades",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "ciudad",
+                      "expression": "`ciudad`"
+                    },
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    },
+                    {
+                      "name": "measure(n_viviendas)",
+                      "expression": "MEASURE(`n_viviendas`)"
+                    },
+                    {
+                      "name": "measure(precio_promedio)",
+                      "expression": "MEASURE(`precio_promedio`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Precio promedio por ciudad"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "ciudad",
+                    "displayName": "Ciudad"
+                  },
+                  {
+                    "fieldName": "departamento",
+                    "displayName": "Departamento"
+                  },
+                  {
+                    "fieldName": "measure(n_viviendas)",
+                    "displayName": "Viviendas"
+                  },
+                  {
+                    "fieldName": "measure(precio_promedio)",
+                    "displayName": "Precio promedio (COP)"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 7,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_precio_depto",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "measure(precio_promedio)",
+                      "expression": "MEASURE(`precio_promedio`)"
+                    },
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`price` BETWEEN 30000000 AND 3000000000"
+                    },
+                    {
+                      "expression": "`depto_con_muestra` = true"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Precio promedio por departamento (Top 12)"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(precio_promedio)",
+                  "displayName": "Precio promedio (COP)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "departamento",
+                  "displayName": "Departamento",
+                  "scale": {
+                    "categorySize": {
+                      "number": 12,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(precio_promedio)",
+                  "legend": {
+                    "hide": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "modelo_predicciones",
+      "displayName": "Modelo y Predicciones",
+      "layout": [
+        {
+          "widget": {
+            "name": "tabla_modelos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "modelos_metricas",
+                  "fields": [
+                    {
+                      "name": "modelo",
+                      "expression": "`modelo`"
+                    },
+                    {
+                      "name": "measure(rmse)",
+                      "expression": "MEASURE(`rmse`)"
+                    },
+                    {
+                      "name": "measure(mae)",
+                      "expression": "MEASURE(`mae`)"
+                    },
+                    {
+                      "name": "measure(r2)",
+                      "expression": "MEASURE(`r2`)"
+                    },
+                    {
+                      "name": "measure(mape)",
+                      "expression": "MEASURE(`mape`)"
+                    },
+                    {
+                      "name": "measure(n_train)",
+                      "expression": "MEASURE(`n_train`)"
+                    },
+                    {
+                      "name": "measure(n_test)",
+                      "expression": "MEASURE(`n_test`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Comparación de modelos (test temporal)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "modelo",
+                    "displayName": "Modelo"
+                  },
+                  {
+                    "fieldName": "measure(rmse)",
+                    "displayName": "RMSE (COP)"
+                  },
+                  {
+                    "fieldName": "measure(mae)",
+                    "displayName": "MAE (COP)"
+                  },
+                  {
+                    "fieldName": "measure(r2)",
+                    "displayName": "R² (COP)"
+                  },
+                  {
+                    "fieldName": "measure(mape)",
+                    "displayName": "MAPE"
+                  },
+                  {
+                    "fieldName": "measure(n_train)",
+                    "displayName": "Anuncios train"
+                  },
+                  {
+                    "fieldName": "measure(n_test)",
+                    "displayName": "Anuncios test"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_mae_ganador",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "modelos_metricas",
+                  "fields": [
+                    {
+                      "name": "measure(mae)",
+                      "expression": "MEASURE(`mae`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`modelo` IN ('GradientBoosting')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "MAE del ganador (COP)",
+                  "fields": []
+                },
+                "description": {
+                  "fields": [],
+                  "value": "Error promedio absoluto en pesos entre el precio real y el predicho."
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(mae)",
+                  "style": {
+                    "fontWeight": 700,
+                    "foreground": "#1D4E89"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_rmse_ganador",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "modelos_metricas",
+                  "fields": [
+                    {
+                      "name": "measure(rmse)",
+                      "expression": "MEASURE(`rmse`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`modelo` IN ('GradientBoosting')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "RMSE del ganador (COP)",
+                  "fields": []
+                },
+                "description": {
+                  "fields": [],
+                  "value": "Error cuadrático medio; penaliza más las desviaciones grandes en el precio."
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(rmse)",
+                  "style": {
+                    "fontWeight": 700,
+                    "foreground": "#4338CA"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_r2_ganador",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "modelos_metricas",
+                  "fields": [
+                    {
+                      "name": "measure(r2)",
+                      "expression": "MEASURE(`r2`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`modelo` IN ('GradientBoosting')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "R² del ganador (escala COP)",
+                  "fields": []
+                },
+                "description": {
+                  "fields": [],
+                  "value": "Proporción de la variación del precio explicada por el modelo (más cerca a 1 es mejor)."
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(r2)",
+                  "style": {
+                    "fontWeight": 700,
+                    "foreground": "#0E9384"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_mape_ganador",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "modelos_metricas",
+                  "fields": [
+                    {
+                      "name": "measure(mape)",
+                      "expression": "MEASURE(`mape`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`modelo` IN ('GradientBoosting')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "MAPE del ganador",
+                  "fields": []
+                },
+                "description": {
+                  "fields": [],
+                  "value": "Porcentaje promedio de error de la predicción respecto al precio real."
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(mape)",
+                  "style": {
+                    "fontWeight": 700,
+                    "foreground": "#D97706"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "heatmap_perfil",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "measure(precio_predicho_promedio)",
+                      "expression": "MEASURE(`precio_predicho_promedio`)"
+                    },
+                    {
+                      "name": "bathrooms",
+                      "expression": "`bathrooms`"
+                    },
+                    {
+                      "name": "bedrooms",
+                      "expression": "`bedrooms`"
+                    },
+                    {
+                      "name": "property_type",
+                      "expression": "`property_type`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`bedrooms` BETWEEN 1 AND 5"
+                    },
+                    {
+                      "expression": "`bathrooms` BETWEEN 1 AND 4"
+                    },
+                    {
+                      "expression": "`property_type` IN ('Casa','Apartamento')"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "facet": {
+                "type": "wrap",
+                "fieldName": "property_type",
+                "scale": {
+                  "type": "categorical"
+                }
+              },
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Precio estimado según habitaciones y baños",
+                "description": {
+                  "fields": [],
+                  "value": "Promedio del precio predicho (COP) del modelo ganador. Casas y apartamentos con 1–5 alcobas y 1–4 baños (test temporal)"
+                }
+              },
+              "version": 3,
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "bathrooms",
+                  "displayName": "Baños",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "bedrooms",
+                  "displayName": "Habitaciones",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(precio_predicho_promedio)",
+                  "displayName": "Precio estimado promedio (COP)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_estandar_ciudad",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "measure(precio_predicho_promedio)",
+                      "expression": "MEASURE(`precio_predicho_promedio`)"
+                    },
+                    {
+                      "name": "ciudad",
+                      "expression": "`ciudad`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`bedrooms` = 3"
+                    },
+                    {
+                      "expression": "`bathrooms` = 2"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Precio estimado: vivienda estándar (3 hab, 2 baños)",
+                "description": {
+                  "fields": [],
+                  "value": "Promedio del precio predicho para una vivienda de 3 alcobas y 2 baños; top 10 ciudades con oferta en el test temporal"
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(precio_predicho_promedio)",
+                  "displayName": "Precio estimado promedio (COP)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "ciudad",
+                  "displayName": "Ciudad",
+                  "scale": {
+                    "categorySize": {
+                      "number": 10,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(precio_predicho_promedio)",
+                  "legend": {
+                    "hide": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_perfiles",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    },
+                    {
+                      "name": "ciudad",
+                      "expression": "`ciudad`"
+                    },
+                    {
+                      "name": "property_type",
+                      "expression": "`property_type`"
+                    },
+                    {
+                      "name": "bedrooms",
+                      "expression": "`bedrooms`"
+                    },
+                    {
+                      "name": "bathrooms",
+                      "expression": "`bathrooms`"
+                    },
+                    {
+                      "name": "measure(precio_predicho_promedio)",
+                      "expression": "MEASURE(`precio_predicho_promedio`)"
+                    },
+                    {
+                      "name": "measure(n_predicciones)",
+                      "expression": "MEASURE(`n_predicciones`)"
+                    }
+                  ],
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`property_type`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": {
+                  "value": "Precios estimados por perfil de vivienda",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Promedio del precio predicho (COP) por perfil; usa los filtros de la página para consultar escenarios específicos",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "departamento",
+                    "displayName": "Departamento"
+                  },
+                  {
+                    "fieldName": "ciudad",
+                    "displayName": "Ciudad"
+                  },
+                  {
+                    "fieldName": "property_type",
+                    "displayName": "Tipo de propiedad"
+                  },
+                  {
+                    "fieldName": "bedrooms",
+                    "displayName": "Habitaciones"
+                  },
+                  {
+                    "fieldName": "bathrooms",
+                    "displayName": "Baños"
+                  },
+                  {
+                    "fieldName": "measure(precio_predicho_promedio)",
+                    "displayName": "Precio predicho promedio (COP)"
+                  },
+                  {
+                    "fieldName": "measure(n_predicciones)",
+                    "displayName": "Anuncios"
+                  }
+                ],
+                "rowOrder": [
+                  {
+                    "by": "column",
+                    "field": {
+                      "index": 2
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_p2_departamento",
+            "queries": [
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_departamento",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    },
+                    {
+                      "name": "departamento_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Departamento"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "departamento",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_departamento"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_p2_ciudad",
+            "queries": [
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_ciudad",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "ciudad",
+                      "expression": "`ciudad`"
+                    },
+                    {
+                      "name": "ciudad_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Ciudad"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "ciudad",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_ciudad"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_p2_tipo",
+            "queries": [
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_property_type",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "property_type",
+                      "expression": "`property_type`"
+                    },
+                    {
+                      "name": "property_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Tipo de propiedad"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "property_type",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_property_type"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_p2_habitaciones",
+            "queries": [
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_bedrooms",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "bedrooms",
+                      "expression": "`bedrooms`"
+                    },
+                    {
+                      "name": "bedrooms_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Habitaciones"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "bedrooms",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_bedrooms"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_p2_banos",
+            "queries": [
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_bathrooms",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "bathrooms",
+                      "expression": "`bathrooms`"
+                    },
+                    {
+                      "name": "bathrooms_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Baños"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "bathrooms",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_bathrooms"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 2,
+            "width": 2,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "distribuciones_ciudades",
+      "displayName": "Distribuciones y Ciudades",
+      "layout": [
+        {
+          "widget": {
+            "name": "tabla_ajuste",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ajuste_distribuciones",
+                  "fields": [
+                    {
+                      "name": "distribucion",
+                      "expression": "`distribucion`"
+                    },
+                    {
+                      "name": "measure(shape)",
+                      "expression": "MEASURE(`shape`)"
+                    },
+                    {
+                      "name": "measure(scale)",
+                      "expression": "MEASURE(`scale`)"
+                    },
+                    {
+                      "name": "measure(k_params)",
+                      "expression": "MEASURE(`k_params`)"
+                    },
+                    {
+                      "name": "measure(log_verosimilitud)",
+                      "expression": "MEASURE(`log_verosimilitud`)"
+                    },
+                    {
+                      "name": "measure(aic)",
+                      "expression": "MEASURE(`aic`)"
+                    },
+                    {
+                      "name": "measure(bic)",
+                      "expression": "MEASURE(`bic`)"
+                    },
+                    {
+                      "name": "measure(delta_aic)",
+                      "expression": "MEASURE(`delta_aic`)"
+                    },
+                    {
+                      "name": "measure(ks_estadistico)",
+                      "expression": "MEASURE(`ks_estadistico`)"
+                    },
+                    {
+                      "name": "measure(n)",
+                      "expression": "MEASURE(`n`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Ajuste de distribuciones de precio (MLE, millones COP)"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "distribucion"
+                  },
+                  {
+                    "fieldName": "measure(shape)"
+                  },
+                  {
+                    "fieldName": "measure(scale)"
+                  },
+                  {
+                    "fieldName": "measure(k_params)"
+                  },
+                  {
+                    "fieldName": "measure(log_verosimilitud)"
+                  },
+                  {
+                    "fieldName": "measure(aic)"
+                  },
+                  {
+                    "fieldName": "measure(bic)"
+                  },
+                  {
+                    "fieldName": "measure(delta_aic)"
+                  },
+                  {
+                    "fieldName": "measure(ks_estadistico)"
+                  },
+                  {
+                    "fieldName": "measure(n)"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 7,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_delta_aic",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ajuste_distribuciones",
+                  "fields": [
+                    {
+                      "name": "distribucion",
+                      "expression": "`distribucion`"
+                    },
+                    {
+                      "name": "measure(delta_aic)",
+                      "expression": "MEASURE(`delta_aic`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Delta AIC por distribución (0 = mejor)",
+                "description": "Ajuste MLE sobre 522.415 ventas (millones COP). Lognormal gana con delta AIC = 0"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "distribucion",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(delta_aic)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 0,
+            "width": 5,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_ciudades",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "resumen_ciudades",
+                  "fields": [
+                    {
+                      "name": "ciudad",
+                      "expression": "`ciudad`"
+                    },
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    },
+                    {
+                      "name": "measure(registros)",
+                      "expression": "MEASURE(`registros`)"
+                    },
+                    {
+                      "name": "measure(precio_promedio)",
+                      "expression": "MEASURE(`precio_promedio`)"
+                    },
+                    {
+                      "name": "measure(precio_m2_mediana)",
+                      "expression": "MEASURE(`precio_m2_mediana`)"
+                    },
+                    {
+                      "name": "measure(area_promedio)",
+                      "expression": "MEASURE(`area_promedio`)"
+                    },
+                    {
+                      "name": "measure(pct_atipicos)",
+                      "expression": "MEASURE(`pct_atipicos`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`con_m2` = true"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Resumen de precios por ciudad",
+                "description": {
+                  "fields": [],
+                  "value": "Ordenado por volumen de oferta. Solo ciudades con precio por m² informado; área promedio sobre superficie construida (gold.housing_model_data)"
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "ciudad",
+                    "displayName": "Ciudad"
+                  },
+                  {
+                    "fieldName": "departamento",
+                    "displayName": "Departamento"
+                  },
+                  {
+                    "fieldName": "measure(registros)",
+                    "displayName": "Total publicaciones"
+                  },
+                  {
+                    "fieldName": "measure(precio_promedio)",
+                    "displayName": "Precio promedio (COP)"
+                  },
+                  {
+                    "fieldName": "measure(precio_m2_mediana)",
+                    "displayName": "Precio m² promedio (COP)"
+                  },
+                  {
+                    "fieldName": "measure(area_promedio)",
+                    "displayName": "Área promedio (m²)"
+                  },
+                  {
+                    "fieldName": "measure(pct_atipicos)",
+                    "displayName": "% de atípicos"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_m2_depto",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "resumen_ciudades",
+                  "fields": [
+                    {
+                      "name": "measure(precio_m2_mediana)",
+                      "expression": "MEASURE(`precio_m2_mediana`)"
+                    },
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`m2_en_rango` = true"
+                    },
+                    {
+                      "expression": "`depto_con_m2_suficiente` = true"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Precio m² promedio por departamento (Top 12)",
+                "description": {
+                  "fields": [],
+                  "value": "Promedio de las medianas ciudad a ciudad; solo precios/m² entre 0,5 y 25 millones COP y departamentos con al menos 20 anuncios con área informada"
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(precio_m2_mediana)",
+                  "displayName": "Precio m² promedio (COP)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "departamento",
+                  "displayName": "Departamento",
+                  "scale": {
+                    "categorySize": {
+                      "number": 12,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(precio_m2_mediana)",
+                  "legend": {
+                    "hide": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_atipicos_depto",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "resumen_ciudades",
+                  "fields": [
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    },
+                    {
+                      "name": "measure(pct_atipicos)",
+                      "expression": "MEASURE(`pct_atipicos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": {
+                  "value": "Fracción de anuncios atípicos por departamento (Top 12)",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Fracción de anuncios marcados como atípicos de precio en Silver (regla IQR)",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "departamento",
+                  "scale": {
+                    "categorySize": {
+                      "number": 12,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(pct_atipicos)",
+                  "displayName": "Anuncios atípicos",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 12,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "bar_top15_oferta",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "resumen_ciudades",
+                  "fields": [
+                    {
+                      "name": "measure(precio_promedio)",
+                      "expression": "MEASURE(`precio_promedio`)"
+                    },
+                    {
+                      "name": "ciudad",
+                      "expression": "`ciudad`"
+                    },
+                    {
+                      "name": "measure(registros)",
+                      "expression": "MEASURE(`registros`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`con_m2` = true"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Top 15 ciudades con mayor oferta de viviendas",
+                "description": {
+                  "fields": [],
+                  "value": "Ordenadas por volumen de oferta (ciudades con precio/m² informado); el color indica el precio promedio de la ciudad"
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "ciudad",
+                  "displayName": "Ciudad",
+                  "scale": {
+                    "categorySize": {
+                      "number": 15,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(registros)",
+                  "displayName": "Viviendas en oferta",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(precio_promedio)",
+                  "legend": {
+                    "hide": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "metodologia",
+      "displayName": "Metodología",
+      "layout": [
+        {
+          "widget": {
+            "name": "text_pipeline",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## Pipeline de datos\n",
+                    "\n",
+                    "**Fuente única:** catálogo `housing_colombia`, tablas verificadas del esquema `gold`. Este dashboard no usa datos simulados ni inventados.\n",
+                    "\n",
+                    "| Capa | Contenido |\n",
+                    "| --- | --- |\n",
+                    "| Bronze | Anuncios crudos de Properati ( Colombia ) cargados tal cual |\n",
+                    "| Silver | `housing_clean`: ventas en COP con precio y fecha válidos, atípicos marcados por regla IQR |\n",
+                    "| Gold | 6 tablas de análisis: `housing_model_data`, `housing_predictions`, `housing_feature_importance`, `housing_price_metrics`, `housing_price_distribution`, `housing_city_summary` |\n",
+                    "\n",
+                    "**Universo de modelado:** 568.478 ventas en COP publicadas entre jul-2020 y ago-2021, en 345 ciudades.\n",
+                    "\n",
+                    "**Split temporal 80/20** por fecha de publicación: train 454.153 anuncios (hasta el 2021-04-12) y test 114.325 anuncios (desde el 2021-04-13). El mismo corte usado al entrenar y validar el modelo ganador."
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "text_modelo",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## Modelado y evaluación\n",
+                    "\n",
+                    "Se entrenaron 4 modelos sobre 14 variables predictoras sin fuga de información, con seguimiento en MLflow:\n",
+                    "\n",
+                    "* LinearRegression\n",
+                    "* RandomForest\n",
+                    "* **Gradient Boosting (HistGradientBoostingRegressor) — ganador**\n",
+                    "* Baseline (mediana del train)\n",
+                    "\n",
+                    "**Métricas reales del ganador sobre el test temporal (114.325 anuncios):**\n",
+                    "\n",
+                    "| Métrica | Valor |\n",
+                    "| --- | --- |\n",
+                    "| MAE | 433,8 millones COP |\n",
+                    "| RMSE | 2.766,7 millones COP |\n",
+                    "| R² (escala COP) | 0,0420 |\n",
+                    "| R² (escala log) | 0,5576 |\n",
+                    "\n",
+                    "**Importancia de variables (permutation importance):** `bathrooms` es la variable más importante, seguida de `lon`, `property_type`, `lat` y `departamento`. La ubicación y el tipo de propiedad concentran la capacidad predictiva.\n",
+                    "\n",
+                    "Las 114.325 predicciones persistidas en `housing_predictions` provienen del modelo entrenado (sin simulación) y alimentan los widgets de la página **Modelo y Predicciones**."
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "text_advertencias",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "## Distribuciones y advertencias de interpretación\n",
+                    "\n",
+                    "**Ajuste de distribuciones (MLE sobre 522.415 ventas, en millones COP):** Gamma, Lognormal, Weibull y Exponencial. La **Lognormal** es la mejor por AIC (delta AIC = 0), seguida de Weibull, Gamma y Exponencial. El estadístico KS con bootstrap paramétrico rechaza todas las familias con n tan grande; el p-valor naive no es válido porque los parámetros se estimaron de los mismos datos.\n",
+                    "\n",
+                    "**Cómo leer este dashboard:**\n",
+                    "\n",
+                    "* Prefiera la **mediana** al promedio: los precios tienen una cola derecha extrema (el R² en escala COP es bajo, 0,0420, por esos atípicos; en escala logarítmica es 0,5576).\n",
+                    "* `surface_total` está informada solo en ~4,1% de los anuncios y `surface_covered` en ~5,7%: los precios por m² cubren solo ese subconjunto.\n",
+                    "* Los filtros globales (departamento, tipo de propiedad, fecha) afectan las páginas de mercado, modelo y ciudades; las tablas de métricas y distribución son resultados fijos del entrenamiento.\n",
+                    "\n",
+                    "**Trazabilidad:** todos los valores provienen de `housing_colombia.gold` y son reproducibles con Databricks SQL."
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "filtro_departamento",
+            "queries": [
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147e711246bc8d87d68996ab6b_departamento",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    },
+                    {
+                      "name": "departamento_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_departamento",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    },
+                    {
+                      "name": "departamento_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147e99177080a9558153b2801e_departamento",
+                "query": {
+                  "datasetName": "resumen_ciudades",
+                  "fields": [
+                    {
+                      "name": "departamento",
+                      "expression": "`departamento`"
+                    },
+                    {
+                      "name": "departamento_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Departamento",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "departamento",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147e711246bc8d87d68996ab6b_departamento"
+                  },
+                  {
+                    "fieldName": "departamento",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_departamento"
+                  },
+                  {
+                    "fieldName": "departamento",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147e99177080a9558153b2801e_departamento"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_tipo_propiedad",
+            "queries": [
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147e711246bc8d87d68996ab6b_property_type",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "property_type",
+                      "expression": "`property_type`"
+                    },
+                    {
+                      "name": "property_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_property_type",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "property_type",
+                      "expression": "`property_type`"
+                    },
+                    {
+                      "name": "property_type_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Tipo de propiedad",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "property_type",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147e711246bc8d87d68996ab6b_property_type"
+                  },
+                  {
+                    "fieldName": "property_type",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_property_type"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_fecha",
+            "queries": [
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147e711246bc8d87d68996ab6b_start_date",
+                "query": {
+                  "datasetName": "datos_mercado",
+                  "fields": [
+                    {
+                      "name": "start_date",
+                      "expression": "`start_date`"
+                    },
+                    {
+                      "name": "start_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_start_date",
+                "query": {
+                  "datasetName": "predicciones",
+                  "fields": [
+                    {
+                      "name": "start_date",
+                      "expression": "`start_date`"
+                    },
+                    {
+                      "name": "start_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Fecha de publicación",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "start_date",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147e711246bc8d87d68996ab6b_start_date"
+                  },
+                  {
+                    "fieldName": "start_date",
+                    "queryName": "dashboards/01f1de13584a1d08a90c1a7dd482c8e5/datasets/01f1de147eee14f79f9be663e4e78674_start_date"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "selectionColor": {
+        "light": "#2EC4B6",
+        "dark": "#2EC4B6"
+      },
+      "visualizationColors": [
+        "#1D4E89",
+        "#2EC4B6",
+        "#FF6F61",
+        "#FFB302",
+        "#8E7CC3"
+      ],
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED",
+      "continuousGradient": {
+        "lightMode": {
+          "customSequential": {
+            "start": "#BDE3DF",
+            "end": "#1D4E89"
+          }
+        },
+        "darkMode": {
+          "customSequential": {
+            "start": "#2EC4B6",
+            "end": "#12294A"
+          }
+        }
+      },
+      "fontSettings": {
+        "base": {
+          "fontFamily": "Inter",
+          "fontSize": 13
+        },
+        "widgetTitle": {
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": 600
+        },
+        "widgetDescription": {
+          "fontFamily": "Inter",
+          "fontSize": 12
+        },
+        "fieldTitle": {
+          "fontFamily": "Inter",
+          "fontWeight": 500
+        },
+        "fieldValue": {
+          "fontFamily": "Inter",
+          "fontSize": 12
+        }
+      }
+    },
+    "applyModeEnabled": false
+  }
+}
